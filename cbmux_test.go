@@ -12,7 +12,7 @@ import (
 func Example() {
 
 	// Set the timeout to 2ms, and print something nice when the state changes
-	var st = DefaultSettings
+	var st = Settings[string]{}
 	st.Timeout = 2 * time.Millisecond
 	st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
 		fmt.Printf("%s: %+v -> %+v\n", name, from, to)
@@ -20,7 +20,7 @@ func Example() {
 
 	// Our ExecFunc sleeps for a half-second so it is visually obvious when it is being
 	// called ('breaker closed), versus skipped ('breaker open)
-	var efunc = func(input string) func() (string, error) {
+	st.ExecClosure = func(input string) func() (string, error) {
 		return func() (string, error) {
 			time.Sleep(500 * time.Millisecond)
 			if input == "yes" {
@@ -31,7 +31,7 @@ func Example() {
 	}
 
 	// Create a mux, passing it our Settings and ExecFunc
-	cbm := NewMux(st, efunc)
+	cbm := NewMux(st)
 
 	// We call "no" 20 times, but after the first 5 it will trip and fast-fail the last 15.
 	for i := range 20 {
@@ -71,7 +71,7 @@ func TestCache(t *testing.T) {
 
 func TestMuxSimple(t *testing.T) {
 
-	st := DefaultSettings
+	st := Settings[string]{}
 	st.Timeout = 2 * time.Millisecond
 
 	var state = gobreaker.StateClosed
@@ -79,7 +79,7 @@ func TestMuxSimple(t *testing.T) {
 		state = to
 	}
 
-	var efunc = func(input string) func() (string, error) {
+	st.ExecClosure = func(input string) func() (string, error) {
 		return func() (string, error) {
 			if input == "yes" {
 				return "yes", nil
@@ -88,7 +88,7 @@ func TestMuxSimple(t *testing.T) {
 		}
 	}
 
-	cbm := NewMux(st, efunc)
+	cbm := NewMux(st)
 	defer cbm.Clear()
 
 	Convey("When a new mux is created, and there are no problems, the 'breaker should stay closed.", t, func() {

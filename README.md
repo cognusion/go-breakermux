@@ -18,7 +18,7 @@ Plans include expiry of 'breakers, hence the tracking of mtime and atime.
 ##### Example :
 ``` go
 // Set the timeout to 2ms, and print something nice when the state changes
-var st = DefaultSettings
+var st = Settings[string]{}
 st.Timeout = 2 * time.Millisecond
 st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
     fmt.Printf("%s: %+v -> %+v\n", name, from, to)
@@ -26,7 +26,7 @@ st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
 
 // Our ExecFunc sleeps for a half-second so it is visually obvious when it is being
 // called ('breaker closed), versus skipped ('breaker open)
-var efunc = func(input string) func() (string, error) {
+st.ExecClosure = func(input string) func() (string, error) {
     return func() (string, error) {
         time.Sleep(500 * time.Millisecond)
         if input == "yes" {
@@ -37,7 +37,7 @@ var efunc = func(input string) func() (string, error) {
 }
 
 // Create a mux, passing it our Settings and ExecFunc
-cbm := NewMux(st, efunc)
+cbm := NewMux(st)
 
 // We call "no" 20 times, but after the first 5 it will trip and fast-fail the last 15.
 for i := range 20 {
@@ -57,13 +57,13 @@ fmt.Println()
 
 
 ## <a name="pkg-index">Index</a>
-* [Variables](#pkg-variables)
 * [type CircuitBreakerMux](#CircuitBreakerMux)
-  * [func NewMux[T any](st gobreaker.Settings, execfunc ExecFunc[T]) *CircuitBreakerMux[T]](#NewMux)
+  * [func NewMux[T any](st Settings[T]) *CircuitBreakerMux[T]](#NewMux)
   * [func (c *CircuitBreakerMux[T]) Clear()](#CircuitBreakerMux.Clear)
   * [func (c *CircuitBreakerMux[T]) Delete(key string)](#CircuitBreakerMux.Delete)
   * [func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error)](#CircuitBreakerMux.Get)
 * [type ExecFunc](#ExecFunc)
+* [type Settings](#Settings)
 
 #### <a name="pkg-examples">Examples</a>
 * [Package](#example-)
@@ -73,17 +73,10 @@ fmt.Println()
 
 
 
-## <a name="pkg-variables">Variables</a>
-``` go
-var DefaultSettings gobreaker.Settings
-```
-DefaultSettings is exactly that, so implementors need not import
-gobreaker directly.
 
 
 
-
-## <a name="CircuitBreakerMux">type</a> [CircuitBreakerMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=689:799#L23)
+## <a name="CircuitBreakerMux">type</a> [CircuitBreakerMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=727:837#L26)
 ``` go
 type CircuitBreakerMux[T any] struct {
     // contains filtered or unexported fields
@@ -100,17 +93,17 @@ which can each be in various states.
 
 
 
-### <a name="NewMux">func</a> [NewMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=900:985#L30)
+### <a name="NewMux">func</a> [NewMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=895:951#L33)
 ``` go
-func NewMux[T any](st gobreaker.Settings, execfunc ExecFunc[T]) *CircuitBreakerMux[T]
+func NewMux[T any](st Settings[T]) *CircuitBreakerMux[T]
 ```
-NewMux requires a Settings struct to use for each 'breaker, and an ExecFunc that each will use.
+NewMux requires a Settings for proper configuration.
 
 
 
 
 
-### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1939:1977#L70)
+### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1920:1958#L73)
 ``` go
 func (c *CircuitBreakerMux[T]) Clear()
 ```
@@ -119,7 +112,7 @@ Clear removes all keys and 'breakers.
 
 
 
-### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1819:1868#L65)
+### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1800:1849#L68)
 ``` go
 func (c *CircuitBreakerMux[T]) Delete(key string)
 ```
@@ -128,7 +121,7 @@ Delete removes a 'breaker named by key, if one exists.
 
 
 
-### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1189:1256#L39)
+### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1170:1237#L42)
 ``` go
 func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error)
 ```
@@ -138,11 +131,31 @@ executes the ExecFunc on it, and returns accordingly.
 
 
 
-## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2093:2144#L75)
+## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2074:2125#L78)
 ``` go
 type ExecFunc[T any] func(string) func() (T, error)
 ```
 ExecFunc is a closure to allow a string to be passed to an otherwise niladic function.
+
+
+
+
+
+
+
+
+
+
+## <a name="Settings">type</a> [Settings](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=466:569#L17)
+``` go
+type Settings[T any] struct {
+    gobreaker.Settings
+    ExecClosure ExecFunc[T]
+    ExpireAfter time.Duration
+}
+
+```
+Settings allows for per-mux and per-'breaker configurations.
 
 
 

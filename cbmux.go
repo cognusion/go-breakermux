@@ -13,9 +13,12 @@ import (
 	"github.com/sony/gobreaker/v2"
 )
 
-// DefaultSettings is exactly that, so implementors need not import
-// gobreaker directly.
-var DefaultSettings gobreaker.Settings
+// Settings allows for per-mux and per-'breaker configurations.
+type Settings[T any] struct {
+	gobreaker.Settings
+	ExecClosure ExecFunc[T]
+	ExpireAfter time.Duration
+}
 
 // CircuitBreakerMux is a goro-safe circuit breaker multiplex,
 // whereby individual keys gets their own 'breakers,
@@ -26,11 +29,11 @@ type CircuitBreakerMux[T any] struct {
 	efunc    ExecFunc[T]
 }
 
-// NewMux requires a Settings struct to use for each 'breaker, and an ExecFunc that each will use.
-func NewMux[T any](st gobreaker.Settings, execfunc ExecFunc[T]) *CircuitBreakerMux[T] {
+// NewMux requires a Settings for proper configuration.
+func NewMux[T any](st Settings[T]) *CircuitBreakerMux[T] {
 	var c CircuitBreakerMux[T]
-	c.st = st
-	c.efunc = execfunc
+	c.st = st.Settings
+	c.efunc = st.ExecClosure
 	return &c
 }
 
