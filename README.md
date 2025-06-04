@@ -5,12 +5,52 @@
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
+* [Examples](#pkg-examples)
 
 ## <a name="pkg-overview">Overview</a>
 Package breakermux builds upon [gobreaker](<a href="https://github.com/sony/gobreaker/v2/">https://github.com/sony/gobreaker/v2/</a>),
 allowing for circuitbreakers to be automatically instantiated for different keys.
 This could be used to 'break on URLs or hostnames, etc.
 
+
+##### Example :
+``` go
+// Set the timeout to 2ms, and print something nice when the state changes
+var st = DefaultSettings
+st.Timeout = 2 * time.Millisecond
+st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
+    fmt.Printf("%s: %+v -> %+v\n", name, from, to)
+}
+
+// Our ExecFunc sleeps for a half-second so it is visually obvious when it is being
+// called ('breaker closed), versus skipped ('breaker open)
+var efunc = func(input string) func() (string, error) {
+    return func() (string, error) {
+        time.Sleep(500 * time.Millisecond)
+        if input == "yes" {
+            return "yes", nil
+        }
+        return "no", fmt.Errorf("Noo")
+    }
+}
+
+// Create a mux, passing it our Settings and ExecFunc
+cbm := NewMux(st, efunc)
+
+// We call "no" 20 times, but after the first 5 it will trip and fast-fail the last 15.
+for i := range 20 {
+    fmt.Printf("%d: ", i)
+    cbm.Get("no")
+}
+fmt.Println()
+
+// We call "yes" 20 times, and each will take a. half. second. to. return.
+for i := range 20 {
+    fmt.Printf("%d: ", i)
+    cbm.Get("yes")
+}
+fmt.Println()
+```
 
 
 
@@ -23,6 +63,8 @@ This could be used to 'break on URLs or hostnames, etc.
   * [func (c *CircuitBreakerMux[T]) Get(key string) (body T, err error)](#CircuitBreakerMux.Get)
 * [type ExecFunc](#ExecFunc)
 
+#### <a name="pkg-examples">Examples</a>
+* [Package](#example-)
 
 #### <a name="pkg-files">Package files</a>
 [cbmux.go](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go)
