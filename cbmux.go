@@ -34,11 +34,11 @@ func NewMux[T any](st gobreaker.Settings, execfunc ExecFunc[T]) *CircuitBreakerM
 
 // Get fetches an existing 'breaker for the key, or creates a new one,
 // executes the ExecFunc on it, and returns accordingly.
-func (c *CircuitBreakerMux[T]) Get(key string) (body T, err error) {
+func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error) {
 	if cba, ok := c.breakers.Load(key); ok {
 		// Got one!
 		var cb = cba.(*cache).Get().(*gobreaker.CircuitBreaker[T])
-		body, err = cb.Execute(c.efunc(key))
+		value, err = cb.Execute(c.efunc(key))
 	} else {
 		// Need a new one!
 		// Clone the default settings, update the name
@@ -53,10 +53,10 @@ func (c *CircuitBreakerMux[T]) Get(key string) (body T, err error) {
 		c.breakers.Store(key, &cba)
 
 		// Go for it!
-		body, err = cb.Execute(c.efunc(key))
+		value, err = cb.Execute(c.efunc(key))
 	}
 
-	return body, err
+	return value, err
 }
 
 // Delete removes a 'breaker named by key, if one exists.

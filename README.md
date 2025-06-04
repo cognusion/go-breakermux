@@ -60,7 +60,7 @@ fmt.Println()
   * [func NewMux[T any](st gobreaker.Settings, execfunc ExecFunc[T]) *CircuitBreakerMux[T]](#NewMux)
   * [func (c *CircuitBreakerMux[T]) Clear()](#CircuitBreakerMux.Clear)
   * [func (c *CircuitBreakerMux[T]) Delete(key string)](#CircuitBreakerMux.Delete)
-  * [func (c *CircuitBreakerMux[T]) Get(key string) (body T, err error)](#CircuitBreakerMux.Get)
+  * [func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error)](#CircuitBreakerMux.Get)
 * [type ExecFunc](#ExecFunc)
 
 #### <a name="pkg-examples">Examples</a>
@@ -108,7 +108,7 @@ NewMux requires a Settings struct to use for each 'breaker, and an ExecFunc that
 
 
 
-### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1859:1897#L68)
+### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1863:1901#L68)
 ``` go
 func (c *CircuitBreakerMux[T]) Clear()
 ```
@@ -117,7 +117,7 @@ Clear removes all keys and 'breakers.
 
 
 
-### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1739:1788#L63)
+### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1743:1792#L63)
 ``` go
 func (c *CircuitBreakerMux[T]) Delete(key string)
 ```
@@ -126,9 +126,9 @@ Delete removes a 'breaker named by key, if one exists.
 
 
 
-### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1113:1179#L37)
+### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1113:1180#L37)
 ``` go
-func (c *CircuitBreakerMux[T]) Get(key string) (body T, err error)
+func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error)
 ```
 Get fetches an existing 'breaker for the key, or creates a new one,
 executes the ExecFunc on it, and returns accordingly.
@@ -136,7 +136,7 @@ executes the ExecFunc on it, and returns accordingly.
 
 
 
-## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2013:2064#L73)
+## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2017:2068#L73)
 ``` go
 type ExecFunc[T any] func(string) func() (T, error)
 ```
