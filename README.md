@@ -8,9 +8,11 @@
 * [Examples](#pkg-examples)
 
 ## <a name="pkg-overview">Overview</a>
-Package breakermux builds upon [gobreaker](<a href="https://github.com/sony/gobreaker/v2/">https://github.com/sony/gobreaker/v2/</a>),
+Package breakermux builds upon gobreaker (<a href="https://github.com/sony/gobreaker/">https://github.com/sony/gobreaker/</a>),
 allowing for circuitbreakers to be automatically instantiated for different keys.
 This could be used to 'break on URLs or hostnames, etc.
+
+Plans include expiry of 'breakers, hence the tracking of mtime and atime.
 
 
 ##### Example :
@@ -81,7 +83,7 @@ gobreaker directly.
 
 
 
-## <a name="CircuitBreakerMux">type</a> [CircuitBreakerMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=613:723#L21)
+## <a name="CircuitBreakerMux">type</a> [CircuitBreakerMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=689:799#L23)
 ``` go
 type CircuitBreakerMux[T any] struct {
     // contains filtered or unexported fields
@@ -98,7 +100,7 @@ which can each be in various states.
 
 
 
-### <a name="NewMux">func</a> [NewMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=824:909#L28)
+### <a name="NewMux">func</a> [NewMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=900:985#L30)
 ``` go
 func NewMux[T any](st gobreaker.Settings, execfunc ExecFunc[T]) *CircuitBreakerMux[T]
 ```
@@ -108,7 +110,7 @@ NewMux requires a Settings struct to use for each 'breaker, and an ExecFunc that
 
 
 
-### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1863:1901#L68)
+### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1939:1977#L70)
 ``` go
 func (c *CircuitBreakerMux[T]) Clear()
 ```
@@ -117,7 +119,7 @@ Clear removes all keys and 'breakers.
 
 
 
-### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1743:1792#L63)
+### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1819:1868#L65)
 ``` go
 func (c *CircuitBreakerMux[T]) Delete(key string)
 ```
@@ -126,7 +128,7 @@ Delete removes a 'breaker named by key, if one exists.
 
 
 
-### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1113:1180#L37)
+### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1189:1256#L39)
 ``` go
 func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error)
 ```
@@ -136,7 +138,7 @@ executes the ExecFunc on it, and returns accordingly.
 
 
 
-## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2017:2068#L73)
+## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2093:2144#L75)
 ``` go
 type ExecFunc[T any] func(string) func() (T, error)
 ```

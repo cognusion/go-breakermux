@@ -1,6 +1,8 @@
-// Package breakermux builds upon [gobreaker](https://github.com/sony/gobreaker/v2/),
+// Package breakermux builds upon gobreaker (https://github.com/sony/gobreaker/),
 // allowing for circuitbreakers to be automatically instantiated for different keys.
 // This could be used to 'break on URLs or hostnames, etc.
+//
+// Plans include expiry of 'breakers, hence the tracking of mtime and atime.
 package breakermux
 
 import (
