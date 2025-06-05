@@ -255,6 +255,7 @@ func TestMuxExpireClear(t *testing.T) {
 	})
 }
 
+// Benchmark_HttpGet loops a function that is like an ExecFunc, that http.Get's a URL and returns the read body or an error.
 func Benchmark_HttpGet(b *testing.B) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, client")
@@ -287,6 +288,7 @@ func Benchmark_HttpGet(b *testing.B) {
 
 }
 
+// Benchmark_Gobreaker loops a function pulling through gobreaker, that http.Get's a URL and returns the read body or an error.
 func Benchmark_Gobreaker(b *testing.B) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, client")
@@ -333,6 +335,7 @@ func Benchmark_Gobreaker(b *testing.B) {
 
 }
 
+// Benchmark_Mux loops an ExecFunc closure, that http.Get's a URL and returns the read body or an error.
 func Benchmark_Mux(b *testing.B) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, client")
@@ -370,6 +373,49 @@ func Benchmark_Mux(b *testing.B) {
 		_, err = cbm.Get(ts.URL)
 		if err != nil {
 			panic(err)
+		}
+	}
+
+}
+
+// Benchmark_MuxFail loops an ExecFunc closure, that fails to http.Get's a URL and returns an error.
+func Benchmark_MuxFail(b *testing.B) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, client")
+	}))
+	defer ts.Close()
+
+	var st = Settings[[]byte]{}
+
+	st.ExecClosure = func(url string) func() ([]byte, error) {
+		return func() ([]byte, error) {
+			resp, err := http.Get(url)
+			if err != nil {
+				return nil, err
+			}
+
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, err
+			}
+
+			return body, nil
+		}
+	}
+
+	cbm := NewMux(st)
+	defer cbm.Close()
+
+	// Close the ts
+	ts.Close()
+
+	var err error
+	b.ResetTimer()
+	for b.Loop() {
+		_, err = cbm.Get(ts.URL)
+		if err != nil {
+			// We fail, deliberately
 		}
 	}
 
