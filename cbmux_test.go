@@ -276,9 +276,10 @@ func Benchmark_HttpGet(b *testing.B) {
 		return body, nil
 	}
 
+	var err error
 	b.ResetTimer()
 	for b.Loop() {
-		_, err := f(ts.URL)
+		_, err = f(ts.URL)
 		if err != nil {
 			panic(err)
 		}
@@ -321,9 +322,10 @@ func Benchmark_Gobreaker(b *testing.B) {
 		return body, nil
 	}
 
+	var err error
 	b.ResetTimer()
 	for b.Loop() {
-		_, err := f(ts.URL)
+		_, err = f(ts.URL)
 		if err != nil {
 			panic(err)
 		}
@@ -362,9 +364,10 @@ func Benchmark_Mux(b *testing.B) {
 	cbm := NewMux(st)
 	defer cbm.Close()
 
+	var err error
 	b.ResetTimer()
 	for b.Loop() {
-		_, err := cbm.Get(ts.URL)
+		_, err = cbm.Get(ts.URL)
 		if err != nil {
 			panic(err)
 		}
