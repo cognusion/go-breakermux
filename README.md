@@ -12,8 +12,6 @@ Package breakermux builds upon gobreaker (<a href="https://github.com/sony/gobre
 allowing for circuitbreakers to be automatically instantiated for different keys.
 This could be used to 'break on URLs or hostnames, etc.
 
-Plans include expiry of 'breakers, hence the tracking of mtime and atime.
-
 
 ##### Example :
 ``` go
@@ -80,7 +78,7 @@ fmt.Println()
 
 
 
-## <a name="CircuitBreakerMux">type</a> [CircuitBreakerMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=593:727#L19)
+## <a name="CircuitBreakerMux">type</a> [CircuitBreakerMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=513:647#L17)
 ``` go
 type CircuitBreakerMux[T any] struct {
     // contains filtered or unexported fields
@@ -97,7 +95,7 @@ which can each be in various states. They must all share a return type.
 
 
 
-### <a name="NewMux">func</a> [NewMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=785:841#L27)
+### <a name="NewMux">func</a> [NewMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=705:761#L25)
 ``` go
 func NewMux[T any](st Settings[T]) *CircuitBreakerMux[T]
 ```
@@ -107,7 +105,7 @@ NewMux requires a Settings for proper configuration.
 
 
 
-### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2641:2679#L106)
+### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2561:2599#L104)
 ``` go
 func (c *CircuitBreakerMux[T]) Clear()
 ```
@@ -116,7 +114,7 @@ Clear removes all keys and 'breakers.
 
 
 
-### <a name="CircuitBreakerMux.Close">func</a> (\*CircuitBreakerMux[T]) [Close](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1635:1673#L68)
+### <a name="CircuitBreakerMux.Close">func</a> (\*CircuitBreakerMux[T]) [Close](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1555:1593#L66)
 ``` go
 func (c *CircuitBreakerMux[T]) Close()
 ```
@@ -125,7 +123,7 @@ Close is the proper way to stop using a mux.
 
 
 
-### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2521:2570#L101)
+### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2441:2490#L99)
 ``` go
 func (c *CircuitBreakerMux[T]) Delete(key string)
 ```
@@ -134,7 +132,7 @@ Delete removes a 'breaker named by key, if one exists.
 
 
 
-### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1891:1958#L75)
+### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1811:1878#L73)
 ``` go
 func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error)
 ```
@@ -144,7 +142,7 @@ executes the ExecFunc on it, and returns accordingly.
 
 
 
-## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=3360:3411#L131)
+## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=3280:3331#L129)
 ``` go
 type ExecFunc[T any] func(string) func() (T, error)
 ```
@@ -159,7 +157,7 @@ ExecFunc is a closure to allow a string to be passed to an otherwise niladic fun
 
 
 
-## <a name="Settings">type</a> [Settings](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=5345:5494#L169)
+## <a name="Settings">type</a> [Settings](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=5325:5474#L168)
 ``` go
 type Settings[T any] struct {
     gobreaker.Settings
@@ -169,7 +167,8 @@ type Settings[T any] struct {
 }
 
 ```
-Settings allows for per-mux and per-'breaker configurations.
+Settings allows for per-mux and per-'breaker configurations. Changing values after passing it to
+NewMux is undefined.
 
 Name is the name of the CircuitBreaker. This is overridden per-'breaker.
 

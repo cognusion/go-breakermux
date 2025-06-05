@@ -1,8 +1,6 @@
 // Package breakermux builds upon gobreaker (https://github.com/sony/gobreaker/),
 // allowing for circuitbreakers to be automatically instantiated for different keys.
 // This could be used to 'break on URLs or hostnames, etc.
-//
-// Plans include expiry of 'breakers, hence the tracking of mtime and atime.
 package breakermux
 
 import (
@@ -130,7 +128,8 @@ func (c *CircuitBreakerMux[T]) expire(deadtime time.Time) {
 // ExecFunc is a closure to allow a string to be passed to an otherwise niladic function.
 type ExecFunc[T any] func(string) func() (T, error)
 
-// Settings allows for per-mux and per-'breaker configurations.
+// Settings allows for per-mux and per-'breaker configurations. Changing values after passing it to
+// NewMux is undefined.
 //
 // Name is the name of the CircuitBreaker. This is overridden per-'breaker.
 //
@@ -173,12 +172,20 @@ type Settings[T any] struct {
 	ExpireCheck time.Duration
 }
 
+// cache is an internal-only storable, that when used properly allows for fast
+// access tracking of write-once, read-many cache objects.
+//
+// The *time members should never be inspected nor set outside of atomic operations.
+// UnixMicro is used. If sub-microsecond resolution is important
+// (e.g. if you're expiring below or near microsecond intervals for some reason),
+// change the various instances below, and the 'deadtime' resolution in func expire() above.
 type cache struct {
 	item  any
 	atime *int64
 	mtime *int64
 }
 
+// newCache returns an initialized cache.
 func newCache() cache {
 	return cache{
 		atime: new(int64),
@@ -186,21 +193,27 @@ func newCache() cache {
 	}
 }
 
+// New sets atime and mtime, ad stores the item.
+// One *could* use this to store a different item in the same cache,
+// but one *should not*: Abandon this cache and create a new one.
 func (c *cache) New(item any) {
 	atomic.StoreInt64(c.mtime, time.Now().UnixMicro())
 	atomic.StoreInt64(c.atime, time.Now().UnixMicro())
 	c.item = item
 }
 
+// Get updates atime, and returns the item.
 func (c *cache) Get() any {
 	atomic.StoreInt64(c.atime, time.Now().UnixMicro())
 	return c.item
 }
 
+// Atime returns the a(ccess) time as a Time.
 func (c *cache) Atime() time.Time {
 	return time.UnixMicro(atomic.LoadInt64(c.atime))
 }
 
+// Mtime returns the m(odification) time as a Time.
 func (c *cache) Mtime() time.Time {
 	return time.UnixMicro(atomic.LoadInt64(c.mtime))
 }
