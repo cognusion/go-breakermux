@@ -10,14 +10,13 @@
 ## <a name="pkg-overview">Overview</a>
 Package breakermux builds upon gobreaker (<a href="https://github.com/sony/gobreaker/">https://github.com/sony/gobreaker/</a>),
 allowing for circuitbreakers to be automatically instantiated for different keys.
-This could be used to 'break on URLs or hostnames, etc.
+This could be used to 'break on URLs, hostnames, service descriptions, etc.
 
 
 ##### Example :
 ``` go
-// Set the timeout to 2ms, and print something nice when the state changes
+// Print something nice when the state changes
 var st = Settings[string]{}
-st.Timeout = 2 * time.Millisecond
 st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
     fmt.Printf("%s: %+v -> %+v\n", name, from, to)
 }
@@ -64,6 +63,7 @@ fmt.Println()
   * [func (c *CircuitBreakerMux[T]) Close()](#CircuitBreakerMux.Close)
   * [func (c *CircuitBreakerMux[T]) Delete(key string)](#CircuitBreakerMux.Delete)
   * [func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error)](#CircuitBreakerMux.Get)
+  * [func (c *CircuitBreakerMux[T]) GetKeyExec(key, exec string) (value T, err error)](#CircuitBreakerMux.GetKeyExec)
 * [type ExecFunc](#ExecFunc)
 * [type Settings](#Settings)
 
@@ -78,7 +78,7 @@ fmt.Println()
 
 
 
-## <a name="CircuitBreakerMux">type</a> [CircuitBreakerMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=513:647#L17)
+## <a name="CircuitBreakerMux">type</a> [CircuitBreakerMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=719:853#L21)
 ``` go
 type CircuitBreakerMux[T any] struct {
     // contains filtered or unexported fields
@@ -89,13 +89,17 @@ CircuitBreakerMux is a goro-safe circuit breaker multiplex,
 whereby individual keys gets their own 'breakers,
 which can each be in various states. They must all share a return type.
 
+In general, an implementation should use either Get(.) or GetKeyExec(..) depending
+on the specificity of the executing request versus the granularity of the desired
+circuit.
 
 
 
 
 
 
-### <a name="NewMux">func</a> [NewMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=705:761#L25)
+
+### <a name="NewMux">func</a> [NewMux](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=911:967#L29)
 ``` go
 func NewMux[T any](st Settings[T]) *CircuitBreakerMux[T]
 ```
@@ -105,7 +109,7 @@ NewMux requires a Settings for proper configuration.
 
 
 
-### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2561:2599#L104)
+### <a name="CircuitBreakerMux.Clear">func</a> (\*CircuitBreakerMux[T]) [Clear](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=3496:3534#L135)
 ``` go
 func (c *CircuitBreakerMux[T]) Clear()
 ```
@@ -114,7 +118,7 @@ Clear removes all keys and 'breakers.
 
 
 
-### <a name="CircuitBreakerMux.Close">func</a> (\*CircuitBreakerMux[T]) [Close](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1555:1593#L66)
+### <a name="CircuitBreakerMux.Close">func</a> (\*CircuitBreakerMux[T]) [Close](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1761:1799#L70)
 ``` go
 func (c *CircuitBreakerMux[T]) Close()
 ```
@@ -123,7 +127,7 @@ Close is the proper way to stop using a mux.
 
 
 
-### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2441:2490#L99)
+### <a name="CircuitBreakerMux.Delete">func</a> (\*CircuitBreakerMux[T]) [Delete](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=3376:3425#L130)
 ``` go
 func (c *CircuitBreakerMux[T]) Delete(key string)
 ```
@@ -132,7 +136,7 @@ Delete removes a 'breaker named by key, if one exists.
 
 
 
-### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=1811:1878#L73)
+### <a name="CircuitBreakerMux.Get">func</a> (\*CircuitBreakerMux[T]) [Get](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2017:2084#L77)
 ``` go
 func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error)
 ```
@@ -142,7 +146,17 @@ executes the ExecFunc on it, and returns accordingly.
 
 
 
-## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=3280:3331#L129)
+### <a name="CircuitBreakerMux.GetKeyExec">func</a> (\*CircuitBreakerMux[T]) [GetKeyExec](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=2728:2808#L104)
+``` go
+func (c *CircuitBreakerMux[T]) GetKeyExec(key, exec string) (value T, err error)
+```
+GetKeyExec fetches an existing 'breaker for the key, or creates a new one,
+passing exec to the ExecFunc, and returns accordingly.
+
+
+
+
+## <a name="ExecFunc">type</a> [ExecFunc](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=4215:4266#L160)
 ``` go
 type ExecFunc[T any] func(string) func() (T, error)
 ```
@@ -157,7 +171,7 @@ ExecFunc is a closure to allow a string to be passed to an otherwise niladic fun
 
 
 
-## <a name="Settings">type</a> [Settings](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=5325:5474#L168)
+## <a name="Settings">type</a> [Settings](https://github.com/cognusion/go-breakermux/tree/master/cbmux.go?s=6353:6502#L201)
 ``` go
 type Settings[T any] struct {
     gobreaker.Settings
@@ -200,9 +214,11 @@ ExecClosure is a closure to allow a string to be passed to an otherwise niladic 
 the 'breakers.
 
 ExpireAfter is a Duration after which an unused 'breaker may be removed for the mux.
+Overly brief expirations are not advised.
 If ExpireAfter is less than or equal to 0, all 'breakers will be removed every ExpireCheck.
 
 ExpireCheck is an interval when expiration checks will be performed.
+Overly aggressive expiration is not advised.
 If ExpireCheck is less than or equal to 0, expiration will not occur.
 
 

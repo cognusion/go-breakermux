@@ -1,6 +1,6 @@
 // Package breakermux builds upon gobreaker (https://github.com/sony/gobreaker/),
 // allowing for circuitbreakers to be automatically instantiated for different keys.
-// This could be used to 'break on URLs or hostnames, etc.
+// This could be used to 'break on URLs, hostnames, service descriptions, etc.
 package breakermux
 
 import (
@@ -14,6 +14,10 @@ import (
 // CircuitBreakerMux is a goro-safe circuit breaker multiplex,
 // whereby individual keys gets their own 'breakers,
 // which can each be in various states. They must all share a return type.
+//
+// In general, an implementation should use either Get(.) or GetKeyExec(..) depending
+// on the specificity of the executing request versus the granularity of the desired
+// circuit.
 type CircuitBreakerMux[T any] struct {
 	breakers sync.Map
 	st       gobreaker.Settings
@@ -78,7 +82,7 @@ func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error) {
 	} else {
 		// Need a new one!
 		// Clone the default settings, update the name
-		ust := c.st
+		var ust = c.st
 		ust.Name = key
 
 		// Create the cb, set it in the map
@@ -90,6 +94,33 @@ func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error) {
 
 		// Go for it!
 		value, err = cb.Execute(c.efunc(key))
+	}
+
+	return value, err
+}
+
+// GetKeyExec fetches an existing 'breaker for the key, or creates a new one,
+// passing exec to the ExecFunc, and returns accordingly.
+func (c *CircuitBreakerMux[T]) GetKeyExec(key, exec string) (value T, err error) {
+	if cba, ok := c.breakers.Load(key); ok {
+		// Got one!
+		var cb = cba.(*cache).Get().(*gobreaker.CircuitBreaker[T])
+		value, err = cb.Execute(c.efunc(exec))
+	} else {
+		// Need a new one!
+		// Clone the default settings, update the name
+		var ust = c.st
+		ust.Name = key
+
+		// Create the cb, set it in the map
+		cb := gobreaker.NewCircuitBreaker[T](ust)
+
+		var cba = newCache()
+		cba.New(cb)
+		c.breakers.Store(key, &cba)
+
+		// Go for it!
+		value, err = cb.Execute(c.efunc(exec))
 	}
 
 	return value, err
@@ -161,9 +192,11 @@ type ExecFunc[T any] func(string) func() (T, error)
 // the 'breakers.
 //
 // ExpireAfter is a Duration after which an unused 'breaker may be removed for the mux.
+// Overly brief expirations are not advised.
 // If ExpireAfter is less than or equal to 0, all 'breakers will be removed every ExpireCheck.
 //
 // ExpireCheck is an interval when expiration checks will be performed.
+// Overly aggressive expiration is not advised.
 // If ExpireCheck is less than or equal to 0, expiration will not occur.
 type Settings[T any] struct {
 	gobreaker.Settings

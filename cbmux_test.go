@@ -15,9 +15,8 @@ import (
 
 func Example() {
 
-	// Set the timeout to 2ms, and print something nice when the state changes
+	// Print something nice when the state changes
 	var st = Settings[string]{}
-	st.Timeout = 2 * time.Millisecond
 	st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
 		fmt.Printf("%s: %+v -> %+v\n", name, from, to)
 	}
@@ -73,6 +72,56 @@ func TestCache(t *testing.T) {
 		So(cba.Get(), ShouldEqual, "Hello")
 		So(cba.Atime(), ShouldHappenBetween, newtime, time.Now())
 		So(cba.Mtime(), ShouldHappenBetween, oldtime, newtime)
+	})
+}
+
+func TestMuxKeyExec(t *testing.T) {
+	defer leaktest.Check(t)()
+
+	st := Settings[string]{}
+	st.Timeout = 2 * time.Millisecond
+
+	var state = gobreaker.StateClosed
+	st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
+		state = to
+	}
+
+	st.ExecClosure = func(input string) func() (string, error) {
+		return func() (string, error) {
+			if input == "yes" {
+				return "yes", nil
+			}
+			return "no", fmt.Errorf("Noo")
+		}
+	}
+
+	cbm := NewMux(st)
+	defer cbm.Close()
+
+	Convey("When a new mux is created, and there are no problems, the 'breaker should stay closed.", t, func() {
+
+		for range 20 {
+			v, e := cbm.GetKeyExec("yes breaker", "yes")
+			So(state, ShouldEqual, gobreaker.StateClosed)
+			So(v, ShouldEqual, "yes")
+			So(e, ShouldBeNil)
+		}
+
+		Convey("... but when a problem does occur, the 'breaker should fly open after five fails.", func() {
+			defer cbm.Delete("no")
+
+			for i := range 20 {
+				_, e := cbm.GetKeyExec("no breaker", "no")
+				So(e, ShouldNotBeNil)
+				if i < 5 {
+					So(state, ShouldEqual, gobreaker.StateClosed)
+				} else {
+					// >= 5
+					So(state, ShouldEqual, gobreaker.StateOpen)
+				}
+			}
+
+		})
 	})
 }
 
