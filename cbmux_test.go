@@ -2,6 +2,9 @@ package breakermux
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -89,7 +92,7 @@ func TestMuxSimple(t *testing.T) {
 	}
 
 	cbm := NewMux(st)
-	defer cbm.Clear()
+	defer cbm.Close()
 
 	Convey("When a new mux is created, and there are no problems, the 'breaker should stay closed.", t, func() {
 
@@ -113,7 +116,250 @@ func TestMuxSimple(t *testing.T) {
 					So(state, ShouldEqual, gobreaker.StateOpen)
 				}
 			}
+
 		})
 	})
+}
+
+func TestMuxSimpleBytes(t *testing.T) {
+
+	st := Settings[[]byte]{}
+	st.Timeout = 2 * time.Millisecond
+
+	var state = gobreaker.StateClosed
+	st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
+		state = to
+	}
+
+	st.ExecClosure = func(input string) func() ([]byte, error) {
+		return func() ([]byte, error) {
+			if input == "yes" {
+				return []byte("yes"), nil
+			}
+			return []byte("no"), fmt.Errorf("Noo")
+		}
+	}
+
+	cbm := NewMux(st)
+	defer cbm.Close()
+
+	Convey("When a new mux is created, and there are no problems, the 'breaker should stay closed.", t, func() {
+
+		for range 20 {
+			v, e := cbm.Get("yes")
+			So(state, ShouldEqual, gobreaker.StateClosed)
+			So(v, ShouldEqual, []byte("yes"))
+			So(e, ShouldBeNil)
+		}
+
+		Convey("... but when a problem does occur, the 'breaker should fly open after five fails.", func() {
+			defer cbm.Delete("no")
+
+			for i := range 20 {
+				_, e := cbm.Get("no")
+				So(e, ShouldNotBeNil)
+				if i < 5 {
+					So(state, ShouldEqual, gobreaker.StateClosed)
+				} else {
+					// >= 5
+					So(state, ShouldEqual, gobreaker.StateOpen)
+				}
+			}
+
+		})
+	})
+}
+
+func TestMuxExpireAfter(t *testing.T) {
+
+	st := Settings[string]{}
+	st.Timeout = 2 * time.Millisecond
+	st.ExpireAfter = 50 * time.Millisecond
+	st.ExpireCheck = 10 * time.Millisecond
+
+	st.ExecClosure = func(input string) func() (string, error) {
+		return func() (string, error) {
+			if input == "yes" {
+				return "yes", nil
+			}
+			return "no", fmt.Errorf("Noo")
+		}
+	}
+
+	cbm := NewMux(st)
+	defer cbm.Close()
+
+	Convey("When a mux is created, configured with ExpireCheck and ExpireAfter is set, and a bunch of breakers are added, and after waiting, an old 'breaker has expired and is gone, but a fresher one is still around.", t, func() {
+		cbm.Get("no")
+		cbm.Get("yes")
+		_, nok := cbm.breakers.Load("no")
+		_, yok := cbm.breakers.Load("yes")
+		So(yok, ShouldBeTrue)
+		So(nok, ShouldBeTrue)
+
+		cbm.Get("no")
+		<-time.After(30 * time.Millisecond)
+		cbm.Get("no")
+		<-time.After(30 * time.Millisecond)
+		_, nok = cbm.breakers.Load("no")
+		_, yok = cbm.breakers.Load("yes")
+		So(yok, ShouldBeFalse)
+		So(nok, ShouldBeTrue)
+
+	})
+}
+
+func TestMuxExpireClear(t *testing.T) {
+
+	st := Settings[string]{}
+	st.Timeout = 2 * time.Millisecond
+	st.ExpireCheck = 10 * time.Millisecond
+
+	st.ExecClosure = func(input string) func() (string, error) {
+		return func() (string, error) {
+			if input == "yes" {
+				return "yes", nil
+			}
+			return "no", fmt.Errorf("Noo")
+		}
+	}
+
+	cbm := NewMux(st)
+	defer cbm.Close()
+
+	Convey("When a mux is created, configured with ExpireCheck but no ExpireAfter, and a bunch of breakers are added, and after waiting, all of the breakers are gone.", t, func() {
+		cbm.Get("no")
+		cbm.Get("yes")
+		_, nok := cbm.breakers.Load("no")
+		_, yok := cbm.breakers.Load("yes")
+		So(yok, ShouldBeTrue)
+		So(nok, ShouldBeTrue)
+
+		cbm.Get("no")
+		<-time.After(30 * time.Millisecond)
+		cbm.Get("no")
+		<-time.After(30 * time.Millisecond)
+		_, nok = cbm.breakers.Load("no")
+		_, yok = cbm.breakers.Load("yes")
+		So(yok, ShouldBeFalse)
+		So(nok, ShouldBeFalse)
+
+	})
+}
+
+func Benchmark_HttpGet(b *testing.B) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, client")
+	}))
+	defer ts.Close()
+
+	f := func(url string) ([]byte, error) {
+		resp, err := http.Get(url)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		return body, nil
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		_, err := f(ts.URL)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+}
+
+func Benchmark_Gobreaker(b *testing.B) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, client")
+	}))
+	defer ts.Close()
+
+	var cb *gobreaker.CircuitBreaker[[]byte]
+	var st gobreaker.Settings
+	st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
+		panic(fmt.Errorf("%s: %s -> %s", name, from, to))
+	}
+	cb = gobreaker.NewCircuitBreaker[[]byte](st)
+
+	f := func(url string) ([]byte, error) {
+		body, err := cb.Execute(func() ([]byte, error) {
+			resp, err := http.Get(url)
+			if err != nil {
+				return nil, err
+			}
+
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, err
+			}
+
+			return body, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return body, nil
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		_, err := f(ts.URL)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+}
+
+func Benchmark_Mux(b *testing.B) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, client")
+	}))
+	defer ts.Close()
+
+	var st = Settings[[]byte]{}
+	st.OnStateChange = func(name string, from gobreaker.State, to gobreaker.State) {
+		panic(fmt.Errorf("%s: %s -> %s", name, from, to))
+	}
+
+	st.ExecClosure = func(url string) func() ([]byte, error) {
+		return func() ([]byte, error) {
+			resp, err := http.Get(url)
+			if err != nil {
+				return nil, err
+			}
+
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, err
+			}
+
+			return body, nil
+		}
+	}
+
+	cbm := NewMux(st)
+	defer cbm.Close()
+
+	b.ResetTimer()
+	for b.Loop() {
+		_, err := cbm.Get(ts.URL)
+		if err != nil {
+			panic(err)
+		}
+	}
 
 }

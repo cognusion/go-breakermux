@@ -15,19 +15,59 @@ import (
 
 // CircuitBreakerMux is a goro-safe circuit breaker multiplex,
 // whereby individual keys gets their own 'breakers,
-// which can each be in various states.
+// which can each be in various states. They must all share a return type.
 type CircuitBreakerMux[T any] struct {
 	breakers sync.Map
 	st       gobreaker.Settings
 	efunc    ExecFunc[T]
+	killChan chan struct{}
 }
 
 // NewMux requires a Settings for proper configuration.
 func NewMux[T any](st Settings[T]) *CircuitBreakerMux[T] {
 	var c CircuitBreakerMux[T]
+	c.killChan = make(chan struct{})
+
+	if st.ExpireCheck > 0 {
+		if st.ExpireAfter <= 0 {
+			// clear the map each interval
+			go func() {
+				for {
+					select {
+					case <-c.killChan:
+						return
+					case <-time.After(st.ExpireCheck):
+						// We use high-level Clear(), instead of
+						// breakers.Clear(), so we can possibly [re]set
+						// other things in the future.
+						c.Clear()
+					}
+				}
+			}()
+		} else {
+			// traverse the map each interval
+			go func() {
+				for {
+					select {
+					case <-c.killChan:
+						return
+					case <-time.After(st.ExpireCheck):
+						c.expire(time.Now().Add(st.ExpireAfter * -1))
+					}
+				}
+			}()
+		}
+	}
+
 	c.st = st.Settings
 	c.efunc = st.ExecClosure
 	return &c
+}
+
+// Close is the proper way to stop using a mux.
+func (c *CircuitBreakerMux[T]) Close() {
+	close(c.killChan)
+	c.breakers.Clear() // low-level Clear() to avoid state changes.
 }
 
 // Get fetches an existing 'breaker for the key, or creates a new one,
@@ -67,6 +107,26 @@ func (c *CircuitBreakerMux[T]) Clear() {
 	c.breakers.Clear()
 }
 
+// expire is a private method to traverse the mux and remove any objects
+// where the atime is before deadtime.
+func (c *CircuitBreakerMux[T]) expire(deadtime time.Time) {
+	deadint := deadtime.UnixMicro()
+
+	// As a rule, we only operate on c.breakers directly here to prevent
+	// future oopsies with higher-level functions that may change state.
+
+	// Range(f func(key, value any) bool)
+	f := func(key, value any) bool {
+		atime := atomic.LoadInt64(value.(*cache).atime)
+		if atime < deadint {
+			c.breakers.Delete(key)
+		}
+		return true
+	}
+
+	c.breakers.Range(f)
+}
+
 // ExecFunc is a closure to allow a string to be passed to an otherwise niladic function.
 type ExecFunc[T any] func(string) func() (T, error)
 
@@ -102,11 +162,15 @@ type ExecFunc[T any] func(string) func() (T, error)
 // the 'breakers.
 //
 // ExpireAfter is a Duration after which an unused 'breaker may be removed for the mux.
-// If ExpireAfter is less than or equal to 0, expiration will not occur.
+// If ExpireAfter is less than or equal to 0, all 'breakers will be removed every ExpireCheck.
+//
+// ExpireCheck is an interval when expiration checks will be performed.
+// If ExpireCheck is less than or equal to 0, expiration will not occur.
 type Settings[T any] struct {
 	gobreaker.Settings
 	ExecClosure func(string) func() (T, error)
 	ExpireAfter time.Duration
+	ExpireCheck time.Duration
 }
 
 type cache struct {
