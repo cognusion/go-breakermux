@@ -3,6 +3,7 @@ module github.com/cognusion/go-breakermux
 go 1.24.3
 
 require (
+	github.com/fortytw2/leaktest v1.3.0
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/sony/gobreaker/v2 v2.1.0
 )

@@ -39,6 +39,9 @@ st.ExecClosure = func(input string) func() (string, error) {
 // Create a mux, passing it our Settings and ExecFunc
 cbm := NewMux(st)
 
+// Always clean up after ourselves!
+defer cbm.Close()
+
 // We call "no" 20 times, but after the first 5 it will trip and fast-fail the last 15.
 for i := range 20 {
     fmt.Printf("%d: ", i)

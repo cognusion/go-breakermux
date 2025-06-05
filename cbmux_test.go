@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fortytw2/leaktest"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/sony/gobreaker/v2"
 )
@@ -35,6 +36,9 @@ func Example() {
 
 	// Create a mux, passing it our Settings and ExecFunc
 	cbm := NewMux(st)
+
+	// Always clean up after ourselves!
+	defer cbm.Close()
 
 	// We call "no" 20 times, but after the first 5 it will trip and fast-fail the last 15.
 	for i := range 20 {
@@ -73,6 +77,7 @@ func TestCache(t *testing.T) {
 }
 
 func TestMuxSimple(t *testing.T) {
+	defer leaktest.Check(t)()
 
 	st := Settings[string]{}
 	st.Timeout = 2 * time.Millisecond
@@ -122,6 +127,7 @@ func TestMuxSimple(t *testing.T) {
 }
 
 func TestMuxSimpleBytes(t *testing.T) {
+	defer leaktest.Check(t)()
 
 	st := Settings[[]byte]{}
 	st.Timeout = 2 * time.Millisecond
@@ -171,6 +177,7 @@ func TestMuxSimpleBytes(t *testing.T) {
 }
 
 func TestMuxExpireAfter(t *testing.T) {
+	defer leaktest.Check(t)()
 
 	st := Settings[string]{}
 	st.Timeout = 2 * time.Millisecond
@@ -210,6 +217,7 @@ func TestMuxExpireAfter(t *testing.T) {
 }
 
 func TestMuxExpireClear(t *testing.T) {
+	defer leaktest.Check(t)()
 
 	st := Settings[string]{}
 	st.Timeout = 2 * time.Millisecond
