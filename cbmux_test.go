@@ -60,7 +60,7 @@ func TestCache(t *testing.T) {
 		oldtime := time.Now()
 		time.Sleep(1 * time.Millisecond)
 
-		var cba = newCache()
+		var cba cache
 		cba.New("Hello")
 
 		newtime := time.Now()

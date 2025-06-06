@@ -88,7 +88,7 @@ func (c *CircuitBreakerMux[T]) Get(key string) (value T, err error) {
 		// Create the cb, set it in the map
 		cb := gobreaker.NewCircuitBreaker[T](ust)
 
-		var cba = newCache()
+		var cba cache
 		cba.New(cb)
 		c.breakers.Store(key, &cba)
 
@@ -115,7 +115,7 @@ func (c *CircuitBreakerMux[T]) GetKeyExec(key, exec string) (value T, err error)
 		// Create the cb, set it in the map
 		cb := gobreaker.NewCircuitBreaker[T](ust)
 
-		var cba = newCache()
+		var cba cache
 		cba.New(cb)
 		c.breakers.Store(key, &cba)
 
@@ -146,7 +146,7 @@ func (c *CircuitBreakerMux[T]) expire(deadtime time.Time) {
 
 	// Range(f func(key, value any) bool)
 	f := func(key, value any) bool {
-		atime := atomic.LoadInt64(value.(*cache).atime)
+		atime := value.(*cache).atime.Load()
 		if atime < deadint {
 			c.breakers.Delete(key)
 		}
@@ -214,39 +214,31 @@ type Settings[T any] struct {
 // change the various instances below, and the 'deadtime' resolution in func expire() above.
 type cache struct {
 	item  any
-	atime *int64
-	mtime *int64
-}
-
-// newCache returns an initialized cache.
-func newCache() cache {
-	return cache{
-		atime: new(int64),
-		mtime: new(int64),
-	}
+	atime atomic.Int64
+	mtime atomic.Int64
 }
 
 // New sets atime and mtime, ad stores the item.
 // One *could* use this to store a different item in the same cache,
 // but one *should not*: Abandon this cache and create a new one.
 func (c *cache) New(item any) {
-	atomic.StoreInt64(c.mtime, time.Now().UnixMicro())
-	atomic.StoreInt64(c.atime, time.Now().UnixMicro())
+	c.mtime.Store(time.Now().UnixMicro())
+	c.atime.Store(time.Now().UnixMicro())
 	c.item = item
 }
 
 // Get updates atime, and returns the item.
 func (c *cache) Get() any {
-	atomic.StoreInt64(c.atime, time.Now().UnixMicro())
+	c.atime.Store(time.Now().UnixMicro())
 	return c.item
 }
 
 // Atime returns the a(ccess) time as a Time.
 func (c *cache) Atime() time.Time {
-	return time.UnixMicro(atomic.LoadInt64(c.atime))
+	return time.UnixMicro(c.atime.Load())
 }
 
 // Mtime returns the m(odification) time as a Time.
 func (c *cache) Mtime() time.Time {
-	return time.UnixMicro(atomic.LoadInt64(c.mtime))
+	return time.UnixMicro(c.mtime.Load())
 }
